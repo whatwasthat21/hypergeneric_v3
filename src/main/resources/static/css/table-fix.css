@@ -1,0 +1,51 @@
+/**
+ * Emergency table fix for dark mode
+ * This file contains specific fixes for tables in dark mode
+ */
+
+/* Direct fix for blueprint table */
+[data-bs-theme="dark"] .table-responsive {
+  background-color: var(--card-bg) !important;
+}
+
+[data-bs-theme="dark"] .table {
+  background-color: var(--card-bg) !important;
+  color: #e9ecef !important;
+}
+
+[data-bs-theme="dark"] .table-striped>tbody>tr:nth-of-type(odd)>* {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  color: #e9ecef !important;
+}
+
+[data-bs-theme="dark"] .table-striped>tbody>tr:nth-of-type(even)>* {
+  background-color: var(--card-bg) !important;
+  color: #e9ecef !important;
+}
+
+[data-bs-theme="dark"] .table>:not(caption)>*>* {
+  background-color: var(--card-bg) !important;
+  color: #e9ecef !important;
+}
+
+/* Table header fix */
+[data-bs-theme="dark"] .table>thead {
+  background-color: #212529 !important;
+  color: #ffffff !important;
+}
+
+[data-bs-theme="dark"] .table>thead>tr>th {
+  background-color: #212529 !important;
+  color: #ffffff !important;
+  border-bottom-color: #495057 !important;
+}
+
+/* Override any inline styles */
+[data-bs-theme="dark"] .table tr[style*="background-color"] {
+  background-color: var(--card-bg) !important;
+}
+
+/* Override Bootstrap's table reset */
+[data-bs-theme="dark"] .table>:not(:first-child) {
+  border-top: 2px solid #495057 !important;
+}

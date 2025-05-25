@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Fields</title>
+</head>
+<body>    <div layout:fragment="scripts">
+        <!-- Standalone field management functions -->
+        <script th:src="@{/js/field-standalone.js}"></script>
+        <script th:src="@{/js/field-debug.js}"></script>        <script>
+            // Initialize when the DOM is fully loaded
+            document.addEventListener('DOMContentLoaded', function() {
+                console.log('Fields page initialized');
+                
+                // Set up type-specific fields display
+                const typeSelect = document.getElementById('type');
+                const editTypeSelect = document.getElementById('editType');
+                
+                if (typeSelect) {
+                    console.log('Setting up create form type-specific fields');
+                    window.updateTypeSpecificFields();
+                }
+                  if (editTypeSelect) {
+                    console.log('Setting up edit form type-specific fields');
+                    window.updateTypeSpecificFields('edit');
+                }
+            });
+        </script>
+    </div>
+    <script>
+        // Define the function in the global scope as a fallback
+        function updateTypeSpecificFields(mode) {
+            console.log('Inline updateTypeSpecificFields called with mode:', mode);
+            const prefix = mode === 'edit' ? 'edit' : '';
+            const typeId = prefix ? `${prefix}Type` : 'type';
+            const numberFieldsId = prefix ? `${prefix}NumberFields` : 'numberFields';
+            
+            const typeElement = document.getElementById(typeId);
+            if (!typeElement) {
+                console.error(`Type element with ID '${typeId}' not found`);
+                return;
+            }
+            
+            const type = typeElement.value;
+            const numberFields = document.getElementById(numberFieldsId);
+            if (!numberFields) {
+                console.error(`Number fields container with ID '${numberFieldsId}' not found`);
+                return;
+            }
+            
+            if (type === 'number') {
+                numberFields.style.display = 'flex';
+            } else {
+                numberFields.style.display = 'none';
+                // Clear number fields when switching away from number type
+                const minNumber = document.getElementById(prefix ? `${prefix}MinNumber` : 'minNumber');
+                const maxNumber = document.getElementById(prefix ? `${prefix}MaxNumber` : 'maxNumber');
+                if (minNumber) minNumber.value = '';
+                if (maxNumber) maxNumber.value = '';
+            }
+        }
+        
+        // Initialize when the DOM is fully loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOMContentLoaded - initializing type fields');
+            
+            // Manual setup for select type handlers
+            const typeSelect = document.getElementById('type');
+            if (typeSelect) {
+                typeSelect.addEventListener('change', function() {
+                    updateTypeSpecificFields();
+                });
+            }
+            
+            const editTypeSelect = document.getElementById('editType');
+            if (editTypeSelect) {
+                editTypeSelect.addEventListener('change', function() {
+                    updateTypeSpecificFields('edit');
+                });
+            }
+        });
+    </script>
+</head>
+<body>
+    <div layout:fragment="content" class="container mt-4">        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>Fields</h1>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createFieldModal">
+                <i class="fas fa-plus"></i> Create Field
+            </button>
+        </div>
+
+        <div class="alert alert-danger" th:if="${error != null}" th:text="${error}"></div>
+        <div class="alert alert-success" th:if="${success != null}" th:text="${success}"></div>
+
+        <!-- Fields Table -->
+        <div class="table-responsive">
+            <table class="table table-striped">                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Key</th>
+                        <th>Label</th>
+                        <th>Type</th>
+                        <th>Widget</th>
+                        <th>Group</th>
+                        <th>Created By</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:if="${fields.empty}">
+                        <td colspan="8" class="text-center">No fields found</td>
+                    </tr>                    <tr th:each="field : ${fields}" th:data-field-id="${field.id}">
+                        <td th:text="${field.id}"></td>
+                        <td th:text="${field.key}"></td>
+                        <td th:text="${field.label}"></td>
+                        <td th:text="${field.type}"></td>
+                        <td th:text="${field.widget ?: '-'}"></td>
+                        <td th:text="${field.groupName ?: '-'}"></td>
+                        <td th:text="${field.createdBy}"></td>                        <td>
+                            <div class="btn-group" role="group">
+                                <button class="btn btn-sm btn-primary" th:onclick="'editField(' + ${field.id} + ')'">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger" th:onclick="'deleteField(' + ${field.id} + ')'">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Create Field Modal -->
+        <div class="modal fade" id="createFieldModal" tabindex="-1" aria-labelledby="createFieldModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="createFieldModalLabel">Create Field</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">                        <div id="createFieldErrorMessage" class="alert alert-danger" style="display: none;"></div>
+                        
+                        <form id="createFieldForm" method="post" novalidate onsubmit="window.submitCreateField(event)">
+                            <input type="hidden" name="_csrf" th:value="${_csrf.token}"/>
+                            <input type="hidden" name="_csrf_header" th:value="${_csrf.headerName}"/>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="key" class="form-label">Key *</label>
+                                    <input type="text" class="form-control" id="key" name="key" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="label" class="form-label">Label *</label>
+                                    <input type="text" class="form-control" id="label" name="label" required>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="description" class="form-label">Description</label>
+                                <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                            </div>                            <div class="row mb-3">
+                                <div class="col-md-6">                                    <label for="type" class="form-label">Type *</label>
+                                    <select class="form-select" id="type" name="type" required onchange="window.updateTypeSpecificFields()">
+                                        <option value="">Select a type...</option>
+                                        <option value="string">String</option>
+                                        <option value="number">Number</option>
+                                        <option value="boolean">Boolean</option>
+                                        <option value="date">Date</option>
+                                        <option value="array">Array</option>
+                                        <option value="object">Object</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="widget" class="form-label">Widget</label>
+                                    <select class="form-select" id="widget" name="widget">
+                                        <option value="">Default</option>
+                                        <option value="text">Text</option>
+                                        <option value="textarea">Textarea</option>
+                                        <option value="select">Select</option>
+                                        <option value="radio">Radio</option>
+                                        <option value="checkbox">Checkbox</option>
+                                        <option value="date">Date</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Number specific fields -->
+                            <div id="numberFields" class="row mb-3" style="display: none;">
+                                <div class="col-md-6">
+                                    <label for="minNumber" class="form-label">Minimum Value</label>
+                                    <input type="number" class="form-control" id="minNumber" name="minNumber" step="any">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="maxNumber" class="form-label">Maximum Value</label>
+                                    <input type="number" class="form-control" id="maxNumber" name="maxNumber" step="any">
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="orderIndex" class="form-label">Order Index</label>
+                                    <input type="number" class="form-control" id="orderIndex" name="orderIndex" value="0">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="groupName" class="form-label">Group Name</label>
+                                    <input type="text" class="form-control" id="groupName" name="groupName">
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="validationJson" class="form-label">Validation JSON</label>
+                                <textarea class="form-control" id="validationJson" name="validationJson" rows="3" placeholder="Enter JSON content"></textarea>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="defaultJson" class="form-label">Default JSON</label>
+                                <textarea class="form-control" id="defaultJson" name="defaultJson" rows="3" placeholder="Enter JSON content"></textarea>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="optionsJson" class="form-label">Options JSON</label>
+                                <textarea class="form-control" id="optionsJson" name="optionsJson" rows="3" placeholder="Enter JSON content"></textarea>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="settingsJson" class="form-label">Settings JSON</label>
+                                <textarea class="form-control" id="settingsJson" name="settingsJson" rows="3" placeholder="Enter JSON content"></textarea>
+                            </div>                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary" id="createButton">Create Field</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>            </div>
+        </div>
+
+        <!-- Edit Field Modal -->
+        <div class="modal fade" id="editFieldModal" tabindex="-1" aria-labelledby="editFieldModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="editFieldModalLabel">Edit Field</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">                        <div id="editFieldErrorMessage" class="alert alert-danger" style="display: none;"></div>
+                          <form id="editFieldForm" method="post" novalidate onsubmit="window.submitEditField(event)">
+                            <input type="hidden" id="editFieldId" name="id">
+                            <input type="hidden" name="_csrf" th:value="${_csrf.token}"/>
+                            <input type="hidden" name="_csrf_header" th:value="${_csrf.headerName}"/>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="editKey" class="form-label">Key *</label>
+                                    <input type="text" class="form-control" id="editKey" name="key" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="editLabel" class="form-label">Label *</label>
+                                    <input type="text" class="form-control" id="editLabel" name="label" required>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="editDescription" class="form-label">Description</label>
+                                <textarea class="form-control" id="editDescription" name="description" rows="3"></textarea>
+                            </div>                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="editType" class="form-label">Type *</label>
+                                    <select class="form-select" id="editType" name="type" required onchange="window.updateTypeSpecificFields('edit')">
+                                        <option value="">Select a type...</option>
+                                        <option value="string">String</option>
+                                        <option value="number">Number</option>
+                                        <option value="boolean">Boolean</option>
+                                        <option value="date">Date</option>
+                                        <option value="array">Array</option>
+                                        <option value="object">Object</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="editWidget" class="form-label">Widget</label>
+                                    <select class="form-select" id="editWidget" name="widget">
+                                        <option value="">Default</option>
+                                        <option value="text">Text</option>
+                                        <option value="textarea">Textarea</option>
+                                        <option value="select">Select</option>
+                                        <option value="radio">Radio</option>
+                                        <option value="checkbox">Checkbox</option>
+                                        <option value="date">Date</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div id="editNumberFields" class="row mb-3" style="display: none;">
+                                <div class="col-md-6">
+                                    <label for="editMinNumber" class="form-label">Minimum Value</label>
+                                    <input type="number" class="form-control" id="editMinNumber" name="minNumber" step="any">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="editMaxNumber" class="form-label">Maximum Value</label>
+                                    <input type="number" class="form-control" id="editMaxNumber" name="maxNumber" step="any">
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="editOrderIndex" class="form-label">Order Index</label>
+                                    <input type="number" class="form-control" id="editOrderIndex" name="orderIndex" value="0">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="editGroupName" class="form-label">Group Name</label>
+                                    <input type="text" class="form-control" id="editGroupName" name="groupName">
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="editValidationJson" class="form-label">Validation JSON</label>
+                                <textarea class="form-control" id="editValidationJson" name="validationJson" rows="3" placeholder="Enter JSON content"></textarea>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="editDefaultJson" class="form-label">Default JSON</label>
+                                <textarea class="form-control" id="editDefaultJson" name="defaultJson" rows="3" placeholder="Enter JSON content"></textarea>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="editOptionsJson" class="form-label">Options JSON</label>
+                                <textarea class="form-control" id="editOptionsJson" name="optionsJson" rows="3" placeholder="Enter JSON content"></textarea>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="editSettingsJson" class="form-label">Settings JSON</label>
+                                <textarea class="form-control" id="editSettingsJson" name="settingsJson" rows="3" placeholder="Enter JSON content"></textarea>                            </div>
+                            
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary" id="updateButton">Update Field</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

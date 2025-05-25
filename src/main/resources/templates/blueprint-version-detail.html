@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Blueprint Version Details</title>
+</head>
+<body>
+    <div layout:fragment="content" class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="mb-0">Blueprint Version Details</h1>
+                <p class="text-muted">
+                    <a th:href="@{/blueprints}" class="text-decoration-none">Blueprints</a> /
+                    <span th:text="${blueprint.name}"></span> /
+                    <span th:text="'Version ' + ${version.version}"></span>
+                </p>
+            </div>
+            <a th:href="@{/blueprints}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Blueprints
+            </a>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <h5>Version Information</h5>
+                        <table class="table table-sm">
+                            <tr>                                <th style="width: 150px">Version Number:</th>
+                                <td th:text="${version.versionNumber}"></td>
+                            </tr>
+                            <tr>
+                                <th>Status:</th>
+                                <td th:text="${version.status}"></td>
+                            </tr>
+                            <tr>
+                                <th>Created By:</th>
+                                <td th:text="${version.createdBy}"></td>
+                            </tr>
+                            <tr>
+                                <th>Created At:</th>
+                                <td th:text="${#temporals.format(version.createdAt, 'MM/dd/yyyy HH:mm')}"></td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Blueprint Information</h5>
+                        <table class="table table-sm">
+                            <tr>
+                                <th style="width: 150px">Name:</th>
+                                <td th:text="${blueprint.name}"></td>
+                            </tr>
+                            <tr>
+                                <th>Description:</th>
+                                <td th:text="${blueprint.description}"></td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+
+                <h5>Version Details</h5>
+                <div class="version-content">
+                    <!-- Add your version-specific content here -->
+                    <p th:text="${version.description ?: 'No description available.'}"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

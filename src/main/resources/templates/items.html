@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+    <div layout:fragment="content" class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>Items</h1>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createItemModal">
+                <i class="fas fa-plus"></i> Create Item
+            </button>
+        </div>
+
+        <div class="alert alert-danger" th:if="${error != null}" th:text="${error}"></div>
+        <div class="alert alert-success" th:if="${success != null}" th:text="${success}"></div>
+
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Blueprint</th>
+                        <th>Version</th>
+                        <th>Status</th>
+                        <th>Created By</th>
+                        <th>Created At</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:if="${items.empty}">
+                        <td colspan="7" class="text-center">No items found</td>
+                    </tr>
+                    <tr th:each="item : ${items}">
+                        <td th:text="${item.id}"></td>
+                        <td th:text="${item.blueprint.name}"></td>
+                        <td th:text="${item.version.name}"></td>
+                        <td th:text="${item.currentState ?: 'Active'}"></td>
+                        <td th:text="${item.createdBy}"></td>
+                        <td th:text="${#temporals.format(item.createdAt, 'MM/dd/yyyy HH:mm')}"></td>
+                        <td>                            <div class="btn-group" role="group">
+                                <button class="btn btn-sm btn-info view-item-btn" th:data-id="${item.id}">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn btn-sm btn-primary edit-item-btn" th:data-id="${item.id}">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger delete-item-btn" th:data-id="${item.id}">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>        </div>
+        
+        <!-- Create Item Modal -->
+        <div class="modal fade" id="createItemModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Create Item</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="createItemForm">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <div class="mb-3">
+                                <label for="blueprintId" class="form-label">Blueprint</label>
+                                <select class="form-control" id="blueprintId" name="blueprintId" required>
+                                    <option value="">Select Blueprint</option>
+                                    <option th:each="blueprint : ${blueprints}" 
+                                            th:value="${blueprint.id}" 
+                                            th:text="${blueprint.name}"></option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="versionId" class="form-label">Version</label>
+                                <select class="form-control" id="versionId" name="versionId" required>
+                                    <option value="">Select Version</option>
+                                    <!-- This will be populated based on selected blueprint -->
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="data" class="form-label">Data (JSON)</label>
+                                <textarea class="form-control" id="data" name="data" rows="5"></textarea>
+                            </div>
+                        </form>
+                    </div>                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="createItemBtn">Create</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Edit Item Modal -->
+        <div class="modal fade" id="editItemModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Edit Item</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="editItemForm">
+                            <input type="hidden" id="editItemId" name="id">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <div class="mb-3">
+                                <label for="editData" class="form-label">Data (JSON)</label>
+                                <textarea class="form-control" id="editData" name="data" rows="5"></textarea>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="updateItemBtn">Update</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script th:src="@{/js/item.js}"></script>
+</body>
+</html>

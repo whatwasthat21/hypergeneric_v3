@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <!-- Our global function for the create button -->
+    <script>
+    function createVersionDirectly() {
+        console.log('Create version button clicked via global handler');
+        try {
+            const blueprintId = document.querySelector('input[name="blueprintId"]').value;
+            console.log('Getting blueprint ID from form:', blueprintId);
+            
+            // Get form data
+            const form = document.getElementById('createVersionForm');
+            if (!form) {
+                console.error('Create version form not found');
+                alert('Error: Form not found. Please refresh the page.');
+                return;
+            }
+            
+            const formData = new FormData(form);
+            const data = {};
+            
+            // Convert FormData to JSON object
+            formData.forEach((value, key) => {
+                // Handle checkboxes specially
+                if (key === 'active') {
+                    data[key] = value === 'on';
+                } else {
+                    data[key] = value;
+                }
+            });
+            
+            // Add blueprint ID if not in form
+            if (!data.blueprintId && blueprintId) {
+                data.blueprintId = Number(blueprintId);
+            }
+            
+            console.log('Submitting blueprint version data:', data);
+            
+            // Show loading indicator
+            const submitBtn = document.getElementById('createVersionButton');
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Creating...';
+            
+            // Retrieve CSRF token from meta tags or input field
+            let csrfHeader = 'X-XSRF-TOKEN';
+            let csrfToken = '';
+            
+            const metaCsrf = document.querySelector('meta[name="_csrf"]');
+            const metaCsrfHeader = document.querySelector('meta[name="_csrf_header"]');
+            if (metaCsrf && metaCsrfHeader) {
+                csrfToken = metaCsrf.content;
+                csrfHeader = metaCsrfHeader.content;
+            } else {
+                const csrfInput = document.querySelector('input[name="_csrf"]');
+                if (csrfInput) {
+                    csrfToken = csrfInput.value;
+                    csrfHeader = 'X-' + csrfInput.name;
+                }
+            }
+            
+            // Make API request
+            const fetchOptions = {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    [csrfHeader]: csrfToken
+                },
+                body: JSON.stringify(data),
+                credentials: 'include'
+            };
+            
+            console.log('Making fetch request with options:', fetchOptions);
+            
+            fetch('/api/blueprint-versions', fetchOptions)
+                .then(response => {
+                    if (!response.ok) {
+                        return response.text().then(text => {
+                            try {
+                                const errorData = JSON.parse(text);
+                                throw new Error(errorData.message || `Failed to create version (${response.status})`);
+                            } catch (e) {
+                                throw new Error(`Server error (${response.status}): ${text}`);
+                            }
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Version created successfully:', data);
+                    
+                    // Show success message
+                    const successAlert = document.createElement('div');
+                    successAlert.className = 'alert alert-success';
+                    successAlert.textContent = 'Version created successfully!';
+                    
+                    const modalBody = document.querySelector('#createVersionModal .modal-body');
+                    if (modalBody) {
+                        modalBody.prepend(successAlert);
+                    }
+                    
+                    // Close modal and reload page after a short delay
+                    setTimeout(() => {
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('createVersionModal'));
+                        if (modal) {
+                            modal.hide();
+                        }
+                        window.location.reload();
+                    }, 1000);
+                })
+                .catch(error => {
+                    console.error('Error creating version:', error);
+                    
+                    // Show error in the modal
+                    const errorAlert = document.createElement('div');
+                    errorAlert.className = 'alert alert-danger';
+                    errorAlert.textContent = `Error creating version: ${error.message}`;
+                    
+                    const modalBody = document.querySelector('#createVersionModal .modal-body');
+                    if (modalBody) {
+                        // Remove any existing alerts
+                        modalBody.querySelectorAll('.alert').forEach(el => el.remove());
+                        modalBody.prepend(errorAlert);
+                    } else {
+                        alert(`Error creating version: ${error.message}`);
+                    }
+                })
+                .finally(() => {
+                    // Reset button state
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalText;
+                });
+        } catch (error) {
+            console.error('Error in createVersionDirectly function:', error);
+            alert('An unexpected error occurred: ' + error.message);
+        }
+    }
+    </script>
+</head>
+<body>
+    <div layout:fragment="content" class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 th:text="${blueprint.name}">Blueprint Detail</h1>
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="history.back()">
+                    <i class="fas fa-arrow-left"></i> Back
+                </button>
+                <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#createVersionModal">
+                    <i class="fas fa-plus"></i> Create Version
+                </button>
+            </div>
+        </div>
+
+        <div class="alert alert-danger" th:if="${error != null}" th:text="${error}"></div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Blueprint Information</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-3">ID</dt>
+                    <dd class="col-sm-9" th:text="${blueprint.id}"></dd>
+
+                    <dt class="col-sm-3">Name</dt>
+                    <dd class="col-sm-9" th:text="${blueprint.name}"></dd>
+
+                    <dt class="col-sm-3">Description</dt>
+                    <dd class="col-sm-9" th:text="${blueprint.description}"></dd>
+
+                    <dt class="col-sm-3">Created By</dt>
+                    <dd class="col-sm-9" th:text="${blueprint.createdBy}"></dd>
+
+                    <dt class="col-sm-3">Created At</dt>
+                    <dd class="col-sm-9" th:text="${#temporals.format(blueprint.createdAt, 'MM/dd/yyyy HH:mm')}"></dd>
+                </dl>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Versions</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Version</th>
+                                <th>Name</th>
+                                <th>Description</th>
+                                <th>Status</th>
+                                <th>Created By</th>
+                                <th>Created At</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:if="${blueprint.versions.empty}">
+                                <td colspan="7" class="text-center">No versions found</td>
+                            </tr>
+                            <tr th:each="version : ${blueprint.versions}">
+                                <td th:text="${version.versionNumber}"></td>
+                                <td th:text="${version.name}"></td>
+                                <td th:text="${version.description}"></td>
+                                <td>
+                                    <span class="badge" th:classappend="${version.active ? 'bg-success' : 'bg-secondary'}"
+                                          th:text="${version.active ? 'Active' : 'Inactive'}"></span>
+                                </td>
+                                <td th:text="${version.createdBy}"></td>
+                                <td th:text="${#temporals.format(version.createdAt, 'MM/dd/yyyy HH:mm')}"></td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <button class="btn btn-sm btn-info view-fields-btn" th:data-id="${version.id}">
+                                            <i class="fas fa-list"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-success activate-version-btn" th:if="${!version.active}"
+                                                th:data-id="${version.id}">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-danger delete-version-btn" th:data-id="${version.id}">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-warning edit-version-btn" data-bs-toggle="modal" data-bs-target="#editVersionModal"
+                                                th:data-id="${version.id}"
+                                                th:data-name="${version.name}"
+                                                th:data-description="${version.description}"
+                                                th:data-active="${version.active}">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Create Version Modal -->
+        <div class="modal fade" id="createVersionModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Create Version</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="createVersionForm">
+                            <input type="hidden" name="blueprintId" th:value="${blueprint.id}">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <div class="mb-3">
+                                <label for="versionName" class="form-label">Name</label>
+                                <input type="text" class="form-control" id="versionName" name="name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="versionDescription" class="form-label">Description</label>
+                                <textarea class="form-control" id="versionDescription" name="description" rows="3"></textarea>
+                            </div>
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" class="form-check-input" id="isActive" name="active">
+                                <label class="form-check-label" for="isActive">Set as active version</label>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="createVersionButton" onclick="createVersionDirectly()">Create</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Version Modal -->
+        <div class="modal fade" id="editVersionModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Edit Version</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="editVersionForm">
+                            <input type="hidden" id="editVersionId" name="id">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <div class="mb-3">
+                                <label for="editVersionName" class="form-label">Name</label>
+                                <input type="text" class="form-control" id="editVersionName" name="name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="editVersionDescription" class="form-label">Description</label>
+                                <textarea class="form-control" id="editVersionDescription" name="description" rows="3"></textarea>
+                            </div>
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" class="form-check-input" id="editIsActive" name="active">
+                                <label class="form-check-label" for="editIsActive">Set as active version</label>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="updateVersionButton">Save Changes</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Blueprint version management script -->
+    <script th:src="@{/js/blueprint_version.js}"></script>
+    
+    <!-- Script for utility functions and other handlers -->
+    <script th:inline="javascript">
+        // Helper function to view fields
+        function viewFields(versionId) {
+            window.location.href = `/blueprint-versions/${versionId}/fields`;
+        }
+        
+        // Helper function to activate a version
+        function activateVersion(versionId) {
+            if (confirm('Are you sure you want to set this version as active?')) {
+                // Use direct fetch with CSRF token from meta tags
+                const metaCsrf = document.querySelector('meta[name="_csrf"]');
+                const metaCsrfHeader = document.querySelector('meta[name="_csrf_header"]');
+                
+                let headers = {
+                    'Content-Type': 'application/json'
+                };
+                
+                if (metaCsrf && metaCsrfHeader) {
+                    headers[metaCsrfHeader.content] = metaCsrf.content;
+                }
+                
+                fetch(`/api/blueprint-versions/${versionId}`, {
+                    method: 'PUT',
+                    headers: headers,
+                    body: JSON.stringify({ active: true }),
+                    credentials: 'include'
+                }).then(response => {
+                    if (!response.ok) {
+                        return response.text().then(text => {
+                            throw new Error(`Failed to activate version: ${text}`);
+                        });
+                    }
+                    // Success - reload the page
+                    window.location.reload();
+                }).catch(error => {
+                    console.error('Error activating version:', error);
+                    alert(`Error activating version: ${error.message}`);
+                });
+            }
+        }
+        
+        // Add this code to debug the error
+        console.log('Main script loaded successfully');
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM fully loaded');
+            
+            // Automatically try the modal's button to see if it works
+            document.querySelector('#createVersionButton').addEventListener('click', function() {
+                console.log('Create button clicked via event listener');
+            });
+        });
+    </script>
+</body>
+</html>

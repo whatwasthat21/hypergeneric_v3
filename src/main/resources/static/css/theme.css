@@ -1,0 +1,319 @@
+/* Light/Dark Theme Styles */
+
+/* Common variables */
+:root {
+    --primary-color: #007bff;
+    --secondary-color: #6c757d;
+    --success-color: #28a745;
+    --info-color: #17a2b8;
+    --warning-color: #ffc107;
+    --danger-color: #dc3545;
+}
+
+/* Light theme (default) */
+:root {
+    --bg-color: #f8f9fa;
+    --text-color: #212529;
+    --card-bg: #ffffff;
+    --card-border: rgba(0, 0, 0, 0.125);
+    --input-bg: #fff;
+    --input-border: #ced4da;
+    --input-text: #495057;
+    --table-stripe: rgba(0, 0, 0, 0.05);
+    --sidebar-bg: #212529;
+    --sidebar-text: rgba(255, 255, 255, 0.8);
+    --header-bg: #f8f9fa;
+    --navbar-bg: #343a40;
+    --modal-bg: #fff;
+    --modal-border: rgba(0, 0, 0, 0.2);
+    --btn-default-bg: #f8f9fa;
+    --btn-default-text: #212529;
+    --body-bg: #f8f9fa;
+    --border-color: #dee2e6;
+}
+
+/* Dark theme */
+[data-bs-theme="dark"] {
+    --bg-color: #212529;
+    --text-color: #f8f9fa;
+    --card-bg: #343a40;
+    --card-border: rgba(255, 255, 255, 0.125);
+    --input-bg: #495057;
+    --input-border: #6c757d;
+    --input-text: #e9ecef;
+    --table-stripe: rgba(255, 255, 255, 0.05);
+    --sidebar-bg: #111417;
+    --sidebar-text: rgba(255, 255, 255, 0.8);
+    --header-bg: #343a40;
+    --navbar-bg: #212529;
+    --modal-bg: #343a40;
+    --modal-border: rgba(255, 255, 255, 0.125);
+    --btn-default-bg: #6c757d;
+    --btn-default-text: #fff;
+    --body-bg: #2c3034;
+    --border-color: #495057;
+}
+
+/* Apply theme colors */
+body {
+    background-color: var(--body-bg);
+    color: var(--text-color);
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.card {
+    background-color: var(--card-bg);
+    border-color: var(--card-border);
+    color: var(--text-color);
+}
+
+/* Table improvements for dark mode */
+[data-bs-theme="dark"] .table {
+    color: #e9ecef;
+    background-color: var(--card-bg);
+}
+
+[data-bs-theme="dark"] .table-striped > tbody > tr:nth-of-type(odd) {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: #e9ecef;
+}
+
+[data-bs-theme="dark"] .table-striped > tbody > tr:nth-of-type(even) {
+    background-color: var(--card-bg);
+    color: #e9ecef;
+}
+
+[data-bs-theme="dark"] .table-hover > tbody > tr:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+/* Fix table header colors */
+[data-bs-theme="dark"] .table > thead > tr > th {
+    background-color: #212529;
+    color: #fff;
+    border-color: #495057;
+}
+
+/* Fix table borders */
+[data-bs-theme="dark"] .table > :not(:first-child) {
+    border-top-color: #495057;
+}
+
+[data-bs-theme="dark"] .table td,
+[data-bs-theme="dark"] .table th {
+    border-color: #495057;
+}
+
+/* Fix table-responsive background */
+[data-bs-theme="dark"] .table-responsive {
+    background-color: transparent !important;
+}
+
+/* Make sure the blueprint list table specifically has a dark background */
+[data-bs-theme="dark"] div.table-responsive > table.table {
+    background-color: var(--card-bg) !important;
+    color: var(--text-color) !important;
+}
+
+/* Alert improvements for dark mode */
+[data-bs-theme="dark"] .alert-info {
+    background-color: rgba(23, 162, 184, 0.2);
+    border-color: rgba(23, 162, 184, 0.4);
+    color: #8ed6e2;
+}
+
+[data-bs-theme="dark"] .alert-success {
+    background-color: rgba(40, 167, 69, 0.2);
+    border-color: rgba(40, 167, 69, 0.4);
+    color: #75c688;
+}
+
+[data-bs-theme="dark"] .alert-warning {
+    background-color: rgba(255, 193, 7, 0.2);
+    border-color: rgba(255, 193, 7, 0.4);
+    color: #ffda75;
+}
+
+[data-bs-theme="dark"] .alert-danger {
+    background-color: rgba(220, 53, 69, 0.2);
+    border-color: rgba(220, 53, 69, 0.4);
+    color: #eb7c87;
+}
+
+.card-header {
+    background-color: rgba(0, 0, 0, 0.03);
+    border-bottom-color: var(--card-border);
+}
+
+[data-bs-theme="dark"] .card-header {
+    background-color: rgba(255, 255, 255, 0.03);
+}
+
+.form-control, .form-select {
+    background-color: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--input-text);
+}
+
+.table {
+    color: var(--text-color);
+}
+
+.table-striped > tbody > tr:nth-of-type(odd) {
+    background-color: var(--table-stripe);
+}
+
+.modal-content {
+    background-color: var(--modal-bg);
+    border-color: var(--modal-border);
+    color: var(--text-color);
+}
+
+.modal-header {
+    border-bottom-color: var(--border-color);
+}
+
+.modal-footer {
+    border-top-color: var(--border-color);
+}
+
+.sidebar {
+    background-color: var(--sidebar-bg);
+}
+
+/* Button improvements */
+[data-bs-theme="dark"] .btn-outline-secondary {
+    color: #adb5bd;
+    border-color: #6c757d;
+}
+
+[data-bs-theme="dark"] .btn-outline-secondary:hover {
+    background-color: rgba(108, 117, 125, 0.2);
+    color: #fff;
+}
+
+/* Improve button contrast in tables */
+[data-bs-theme="dark"] .table .btn-info {
+    background-color: rgba(23, 162, 184, 0.8);
+    border-color: rgba(23, 162, 184, 0.9);
+    color: #fff;
+}
+
+[data-bs-theme="dark"] .table .btn-primary {
+    background-color: rgba(0, 123, 255, 0.8);
+    border-color: rgba(0, 123, 255, 0.9);
+    color: #fff;
+}
+
+[data-bs-theme="dark"] .table .btn-danger {
+    background-color: rgba(220, 53, 69, 0.8);
+    border-color: rgba(220, 53, 69, 0.9);
+    color: #fff;
+}
+
+[data-bs-theme="dark"] .table .btn-success {
+    background-color: rgba(40, 167, 69, 0.8);
+    border-color: rgba(40, 167, 69, 0.9);
+    color: #fff;
+}
+
+[data-bs-theme="dark"] .table .btn-group {
+    background-color: transparent;
+}
+
+/* Ensure text color in tables is consistent */
+[data-bs-theme="dark"] .table td {
+    color: #e9ecef;
+}
+
+/* Pre blocks and code */
+[data-bs-theme="dark"] pre, 
+[data-bs-theme="dark"] code {
+    background-color: #2d3238;
+    color: #f8f9fa;
+    border-color: #495057;
+}
+
+/* Dropdown improvements */
+[data-bs-theme="dark"] .dropdown-menu {
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+}
+
+[data-bs-theme="dark"] .dropdown-item {
+    color: var(--text-color);
+}
+
+[data-bs-theme="dark"] .dropdown-item:hover,
+[data-bs-theme="dark"] .dropdown-item:focus {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+.border {
+    border-color: var(--border-color) !important;
+}
+
+.border-top {
+    border-top-color: var(--border-color) !important;
+}
+
+.border-bottom {
+    border-bottom-color: var(--border-color) !important;
+}
+
+.border-start {
+    border-left-color: var(--border-color) !important;
+}
+
+.border-end {
+    border-right-color: var(--border-color) !important;
+}
+
+/* Custom styles for theme toggle */
+.theme-toggle {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    z-index: 1030;
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0.8;
+    transition: opacity 0.3s;
+}
+
+.theme-toggle:hover {
+    opacity: 1;
+}
+
+.theme-toggle i {
+    font-size: 1.25rem;
+}
+
+/* Fix container backgrounds in dark theme */
+[data-bs-theme="dark"] .container,
+[data-bs-theme="dark"] .container-fluid,
+[data-bs-theme="dark"] .container-sm,
+[data-bs-theme="dark"] .container-md,
+[data-bs-theme="dark"] .container-lg,
+[data-bs-theme="dark"] .container-xl,
+[data-bs-theme="dark"] .container-xxl {
+    background-color: transparent;
+}
+
+/* Ensure backgrounds of content areas are consistent */
+[data-bs-theme="dark"] .content-wrapper {
+    background-color: var(--body-bg);
+}
+
+/* Fix any remaining white backgrounds */
+[data-bs-theme="dark"] .bg-white,
+[data-bs-theme="dark"] .bg-light {
+    background-color: var(--card-bg) !important;
+}

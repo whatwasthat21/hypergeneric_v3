@@ -1,0 +1,756 @@
+// Blueprint management functionality with page cache integration
+
+// Declare functions before using them
+let submitCreateBlueprint;
+let toggleVersions; 
+let loadBlueprintVersions;
+
+// Initialize core functions in global scope
+(function(window) {
+    // Make functions available globally for inline event handlers
+    window.viewVersions = function(id) {
+        console.log('Global viewVersions called with ID:', id);
+        
+        // Save current page state before navigation
+        if (window.PageCache) {
+            PageCache.captureCurrentPageState();
+        }
+        
+        window.location.href = `/blueprints/${id}`;
+    };
+
+    // Global createVersion function for showing the create version modal
+    window.createVersion = function(id) {
+        console.log('Creating version for blueprint ID:', id);
+        
+        // Set the blueprint ID in the hidden form field
+        const blueprintIdField = document.getElementById('versionBlueprintId');
+        if (blueprintIdField) {
+            blueprintIdField.value = id;
+        }
+        
+        // Clear any previous form values
+        const form = document.getElementById('createVersionForm');
+        if (form) {
+            form.reset();
+            
+            // Remove any existing alerts
+            form.querySelectorAll('.alert').forEach(alert => alert.remove());
+        }
+        
+        // Show the modal
+        const modal = document.getElementById('createVersionModal');
+        if (modal) {
+            const bsModal = new bootstrap.Modal(modal);
+            bsModal.show();
+        }
+    };
+    
+    console.log('Blueprint global functions initialized');
+})(window);
+
+// Function to toggle versions visibility
+toggleVersions = function(blueprintId) {
+    console.log('Toggling versions for blueprint ID:', blueprintId);
+    
+    const versionsRow = document.getElementById(`versions-row-${blueprintId}`);
+    if (!versionsRow) {
+        console.error(`Versions row not found for blueprint ID ${blueprintId}`);
+        return;
+    }
+    
+    // Find the toggle button
+    const toggleButton = document.querySelector(`.toggle-versions-btn[data-id="${blueprintId}"]`);
+    
+    // Toggle the visibility
+    if (versionsRow.classList.contains('d-none')) {
+        // Show the versions row
+        versionsRow.classList.remove('d-none');
+        
+        // Update toggle button if found
+        if (toggleButton) {
+            toggleButton.classList.add('active');
+        }
+        
+        // Check if versions are already loaded
+        const versionsList = versionsRow.querySelector('.versions-list');
+        if (versionsList && versionsList.children.length === 0) {
+            // Show loading indicator
+            const loadingIndicator = versionsRow.querySelector('.versions-loading');
+            if (loadingIndicator) {
+                loadingIndicator.classList.remove('d-none');
+            }
+            
+            // Load versions data
+            loadBlueprintVersions(blueprintId, versionsRow);
+        }
+    } else {
+        // Hide the versions row
+        versionsRow.classList.add('d-none');
+        
+        // Update toggle button if found
+        if (toggleButton) {
+            toggleButton.classList.remove('active');
+        }
+    }
+}
+
+// Function to load blueprint versions
+loadBlueprintVersions = function(blueprintId, versionsRow) {
+    console.log('Loading versions for blueprint ID:', blueprintId);
+    
+    // API endpoint for versions
+    const url = `/api/blueprints/${blueprintId}/versions`;
+    
+    fetch(url)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(versions => {
+            console.log('Versions loaded:', versions);
+            
+            // Hide loading indicator
+            const loadingIndicator = versionsRow.querySelector('.versions-loading');
+            if (loadingIndicator) {
+                loadingIndicator.classList.add('d-none');
+            }
+            
+            // Get the versions list container
+            const versionsList = versionsRow.querySelector('.versions-list');
+            if (!versionsList) {
+                console.error('Versions list container not found');
+                return;
+            }
+            
+            // Display versions or "no versions" message
+            if (!versions || versions.length === 0) {
+                versionsList.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center">No versions found</td>
+                    </tr>
+                `;
+            } else {
+                // Sort versions by version number (descending)
+                versions.sort((a, b) => b.versionNumber - a.versionNumber);
+                
+                // Create HTML for each version
+                const versionRows = versions.map(version => {
+                    return `
+                        <tr>
+                            <td>${version.versionNumber}</td>
+                            <td>${version.name || ''}</td>
+                            <td>${version.description || ''}</td>
+                            <td>
+                                <span class="badge ${version.active ? 'bg-success' : 'bg-secondary'}">
+                                    ${version.active ? 'Active' : 'Inactive'}
+                                </span>
+                            </td>
+                            <td>${version.createdBy || ''}</td>
+                        </tr>
+                    `;
+                }).join('');
+                
+                versionsList.innerHTML = versionRows;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading blueprint versions:', error);
+            
+            // Hide loading indicator
+            const loadingIndicator = versionsRow.querySelector('.versions-loading');
+            if (loadingIndicator) {
+                loadingIndicator.classList.add('d-none');
+            }
+            
+            // Display error message
+            const versionsList = versionsRow.querySelector('.versions-list');
+            if (versionsList) {
+                versionsList.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center text-danger">
+                            Error loading versions: ${error.message}
+                        </td>
+                    </tr>
+                `;
+            }
+        });
+}
+
+window.editBlueprint = function(id) {
+    console.log('Global editBlueprint called with ID:', id);
+    if (typeof fetchWithCsrf !== 'function') {
+        console.error('CSRF utility functions not found. Make sure csrf.js is loaded.');
+        alert('Error: CSRF utility not available. Please refresh the page.');
+        return;
+    }
+    
+    fetchWithCsrf(`/api/blueprints/${id}`)
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Failed to fetch blueprint details');
+        }
+        return response.json();
+    })
+    .then(blueprint => {
+        console.log('Blueprint details fetched:', blueprint);
+        
+        // Get the modal
+        const editModal = document.getElementById('editBlueprintModal');
+        if (!editModal) {
+            console.error('Edit modal not found');
+            return;
+        }
+        
+        // If this is the first time opening the modal
+        if (!document.getElementById('editBlueprintForm')) {
+            // Clone the create modal
+            const createModal = document.getElementById('createBlueprintModal');
+            if (!createModal) {
+                throw new Error('Create blueprint modal not found');
+            }
+            
+            // Check if edit modal already exists, if not create it
+            let editModal = document.getElementById('editBlueprintModal');
+            
+            if (!editModal) {
+                // Clone the create modal
+                const modalClone = createModal.cloneNode(true);
+                modalClone.id = 'editBlueprintModal';
+                
+                // Update modal title and button
+                const modalTitle = modalClone.querySelector('.modal-title');
+                if (modalTitle) {
+                    modalTitle.textContent = 'Edit Blueprint';
+                }
+                
+                const submitButton = modalClone.querySelector('#createButton');
+                if (submitButton) {
+                    submitButton.id = 'updateButton';
+                    submitButton.textContent = 'Update';
+                }
+                
+                // Update form ID
+                const form = modalClone.querySelector('form');
+                if (form) {
+                    form.id = 'editBlueprintForm';
+                    
+                    // Add hidden ID field
+                    const idInput = document.createElement('input');
+                    idInput.type = 'hidden';
+                    idInput.id = 'editBlueprintId';
+                    idInput.name = 'id';
+                    idInput.value = blueprint.id;
+                    form.appendChild(idInput);
+                }
+                
+                // Append the new modal to the body
+                document.body.appendChild(modalClone);
+                editModal = modalClone;
+                
+                // Add event listener for form submission
+                const editForm = document.getElementById('editBlueprintForm');
+                if (editForm) {
+                    editForm.addEventListener('submit', function(event) {
+                        event.preventDefault();
+                        submitEditBlueprint();
+                    });
+                }
+                
+                // Add event listener for update button
+                const updateBtn = document.getElementById('updateButton');
+                if (updateBtn) {
+                    updateBtn.addEventListener('click', function(event) {
+                        event.preventDefault();
+                        submitEditBlueprint();
+                    });
+                }
+            }
+        }
+        
+        // Fill the form with blueprint data
+        document.getElementById('editBlueprintId').value = blueprint.id;
+        const nameInput = editModal.querySelector('input[name="name"]');
+        const descriptionInput = editModal.querySelector('textarea[name="description"]');
+        
+        if (nameInput) {
+            nameInput.value = blueprint.name;
+        }
+        if (descriptionInput) {
+            descriptionInput.value = blueprint.description || '';
+        }
+        
+        // Show the modal
+        const bsModal = new bootstrap.Modal(editModal);
+        bsModal.show();
+    })
+    .catch(error => {
+        console.error('Error fetching blueprint details:', error);
+        alert('Error fetching blueprint details: ' + error.message);
+    });
+};
+
+window.deleteBlueprint = function(id) {
+    console.log('Global deleteBlueprint called with ID:', id);
+    if (typeof fetchWithCsrf !== 'function') {
+        console.error('CSRF utility functions not found. Make sure csrf.js is loaded.');
+        alert('Error: CSRF utility not available. Please refresh the page.');
+        return;
+    }
+    
+    if (confirm('Are you sure you want to delete this blueprint?')) {
+        fetchWithCsrf(`/api/blueprints/${id}`, {
+            method: 'DELETE'
+        }).then(response => {
+            console.log('Delete response status:', response.status);
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                return response.text().then(text => {
+                    throw new Error(text || 'Error deleting blueprint');
+                });
+            }
+        }).catch(error => {
+            console.error('Error deleting blueprint:', error);
+            alert('Error deleting blueprint: ' + error.message);
+        });
+    }
+};
+
+submitCreateBlueprint = function(event) {
+    if (event) {
+        event.preventDefault();
+    }
+    console.log('submitCreateBlueprint function called');
+    
+    // Get form and validate inputs
+    const form = document.getElementById('createBlueprintForm');
+    if (!form) {
+        console.error('Create blueprint form not found');
+        return;
+    }
+    
+    const nameInput = document.getElementById('name');
+    const descInput = document.getElementById('description');
+    const errorAlert = document.getElementById('modalErrorAlert');
+    const errorMessage = document.getElementById('errorMessage');
+    
+    // Clear previous errors
+    if (errorAlert) {
+        errorAlert.classList.add('d-none');
+    }
+    
+    // Validate inputs
+    if (!nameInput || !nameInput.value.trim()) {
+        if (errorAlert && errorMessage) {
+            errorAlert.classList.remove('d-none');
+            errorMessage.textContent = 'Name is required';
+        }
+        if (nameInput) nameInput.focus();
+        return;
+    }
+    
+    // Check if CSRF functionality is available
+    if (typeof getCsrfToken !== 'function' || typeof fetchWithCsrf !== 'function') {
+        console.error('CSRF utility functions not found. Make sure csrf.js is loaded.');
+        if (errorAlert && errorMessage) {
+            errorAlert.classList.remove('d-none');
+            errorMessage.textContent = 'Authentication error. Please refresh the page.';
+        }
+        return;
+    }
+    
+    // Verify CSRF token availability
+    const csrf = getCsrfToken();
+    if (!csrf.value) {
+        console.error('CSRF token not found');
+        if (errorAlert && errorMessage) {
+            errorAlert.classList.remove('d-none');
+            errorMessage.textContent = 'Authentication error. Please refresh the page.';
+        }
+        return;
+    }
+
+    // Prepare data
+    const data = {
+        name: nameInput.value.trim(),
+        description: descInput ? descInput.value.trim() : ''
+    };
+    
+    console.log('Submitting blueprint data:', data);
+
+    // Show loading indicator on the button
+    const submitBtn = document.getElementById('createButton');
+    if (!submitBtn) {
+        console.error('Create button not found');
+        return;
+    }
+    
+    const originalText = submitBtn.textContent;
+    submitBtn.disabled = true;    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Creating...';
+    
+    // Make API request using fetchWithCsrf
+    fetchWithCsrf('/api/blueprints', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => {
+        console.log('Response status:', response.status);
+        
+        if (!response.ok) {
+            return response.text().then(text => {
+                try {
+                    const data = JSON.parse(text);
+                    throw new Error(data.message || 'Failed to create blueprint');
+                } catch (e) {
+                    throw new Error('Failed to create blueprint: ' + text);
+                }
+            });
+        }
+        
+        return response.json();
+    })
+    .then(data => {
+        console.log('Blueprint created successfully:', data);
+        
+        // Clear page cache for blueprints
+        if (window.PageCache) {
+            PageCache.clearCurrentPageCache();
+            // Trigger custom event for AJAX success
+            triggerAjaxSuccess({ type: 'blueprint', action: 'create', data: data });
+        }
+        
+        // Close the modal first
+        const modal = document.getElementById('createBlueprintModal');
+        if (modal) {
+            const bsModal = bootstrap.Modal.getInstance(modal);
+            if (bsModal) {
+                console.log('Closing modal with Bootstrap API');
+                bsModal.hide();
+            }
+        }
+        
+        // Reset the form
+        form.reset();
+        
+        // Show success message and redirect
+        window.location.href = '/blueprints?success=Blueprint created successfully';
+    })
+    .catch(error => {
+        console.error('Error creating blueprint:', error);
+        
+        // Reset submit button
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+        
+        // Show error message
+        if (errorAlert && errorMessage) {
+            errorAlert.classList.remove('d-none');
+            errorMessage.textContent = error.message || 'An error occurred while creating the blueprint';
+        }
+    });
+}
+
+// Submit Edit Blueprint
+const submitEditBlueprint = function() {
+    console.log('submitEditBlueprint function called');
+    
+    // Get form and validate inputs
+    const form = document.getElementById('editBlueprintForm');
+    if (!form) {
+        console.error('Edit blueprint form not found');
+        return;
+    }
+    
+    const nameInput = form.querySelector('input[name="name"]');
+    const descInput = form.querySelector('textarea[name="description"]');
+    const idInput = document.getElementById('editBlueprintId');
+    const errorAlert = form.querySelector('.alert-danger');
+    const errorMessage = form.querySelector('#errorMessage');
+    
+    // Clear previous errors
+    if (errorAlert) {
+        errorAlert.classList.add('d-none');
+    }
+    
+    // Validate inputs
+    if (!nameInput || !nameInput.value.trim()) {
+        if (errorAlert && errorMessage) {
+            errorAlert.classList.remove('d-none');
+            errorMessage.textContent = 'Name is required';
+        }
+        if (nameInput) nameInput.focus();
+        return;
+    }
+      if (!idInput || !idInput.value) {
+        console.error('Blueprint ID not found');
+        return;
+    }
+    
+    // Check if CSRF functionality is available
+    if (typeof getCsrfToken !== 'function' || typeof fetchWithCsrf !== 'function') {
+        console.error('CSRF utility functions not found. Make sure csrf.js is loaded.');
+        if (errorAlert && errorMessage) {
+            errorAlert.classList.remove('d-none');
+            errorMessage.textContent = 'Authentication error. Please refresh the page.';
+        }
+        return;
+    }
+    
+    // Verify CSRF token availability
+    const csrf = getCsrfToken();
+    if (!csrf.value) {
+        console.error('CSRF token not found');
+        if (errorAlert && errorMessage) {
+            errorAlert.classList.remove('d-none');
+            errorMessage.textContent = 'Authentication error. Please refresh the page.';
+        }
+        return;
+    }
+
+    // Prepare data
+    const data = {
+        name: nameInput.value.trim(),
+        description: descInput ? descInput.value.trim() : '',
+    };
+    
+    console.log('Submitting updated blueprint data:', data);
+
+    // Show loading indicator on the button
+    const submitBtn = document.getElementById('updateButton');
+    if (!submitBtn) {
+        console.error('Update button not found');
+        return;
+    }
+    
+    const originalText = submitBtn.textContent;
+    submitBtn.disabled = true;    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Updating...';
+    
+    // Make API request using fetchWithCsrf
+    fetchWithCsrf(`/api/blueprints/${idInput.value}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => {
+        console.log('Response status:', response.status);
+        
+        if (!response.ok) {
+            return response.text().then(text => {
+                try {
+                    const data = JSON.parse(text);
+                    throw new Error(data.message || 'Failed to update blueprint');
+                } catch (e) {
+                    throw new Error('Failed to update blueprint: ' + text);
+                }
+            });
+        }
+        
+        return response.json();
+    })
+    .then(data => {
+        console.log('Blueprint updated successfully:', data);
+        
+        // Clear page cache for blueprints
+        if (window.PageCache) {
+            PageCache.clearCurrentPageCache();
+            // Trigger custom event for AJAX success
+            triggerAjaxSuccess({ type: 'blueprint', action: 'update', data: data });
+        }
+        
+        // Close the modal first
+        const modal = document.getElementById('editBlueprintModal');
+        if (modal) {
+            const bsModal = bootstrap.Modal.getInstance(modal);
+            if (bsModal) {
+                console.log('Closing modal with Bootstrap API');
+                bsModal.hide();
+            }
+        }
+        
+        // Show success message and redirect
+        window.location.href = '/blueprints?success=Blueprint updated successfully';
+    })
+    .catch(error => {
+        console.error('Error updating blueprint:', error);
+        
+        // Reset submit button
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+        
+        // Show error message
+        if (errorAlert && errorMessage) {
+            errorAlert.classList.remove('d-none');
+            errorMessage.textContent = error.message || 'An error occurred while updating the blueprint';
+        }
+    });
+}
+
+// Initialize event listeners using jQuery-style ready function for compatibility
+(function(callback) {
+    if (document.readyState !== 'loading') {
+        callback();
+    } else if (document.addEventListener) {
+        document.addEventListener('DOMContentLoaded', callback);
+    } else {
+        document.attachEvent('onreadystatechange', function() {
+            if (document.readyState === 'complete') {
+                callback();
+            }
+        });
+    }
+})(function() {
+    console.log('Blueprint management initialized');
+
+    // Add form submit handler
+    const form = document.getElementById('createBlueprintForm');
+    if (form) {
+        form.addEventListener('submit', function(event) {
+            event.preventDefault();
+            console.log('Form submit event triggered');
+            submitCreateBlueprint(event);
+        });
+        console.log('Form submit handler attached');
+    } else {
+        console.error('Create blueprint form not found');
+    }
+    
+    // Also attach click handler to create button as fallback
+    const createButton = document.getElementById('createButton');
+    if (createButton) {
+        createButton.addEventListener('click', function(event) {
+            event.preventDefault();
+            console.log('Create button click event triggered');
+            submitCreateBlueprint(event);
+        });
+        console.log('Create button click handler attached');
+    } else {
+        console.error('Create button not found');
+    }
+    
+    // Add event listeners for table action buttons
+    document.querySelectorAll('.toggle-versions-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const blueprintId = this.getAttribute('data-id');
+            if (blueprintId) {
+                toggleVersions(blueprintId);
+            }
+        });
+    });
+    
+    // Add event listener for create version button
+    const createVersionBtn = document.getElementById('createVersionButton');
+    if (createVersionBtn) {
+        createVersionBtn.addEventListener('click', function() {
+            const blueprintId = document.getElementById('versionBlueprintId').value;
+            if (window.createBlueprintVersion) {
+                window.createBlueprintVersion(blueprintId);
+            } else {
+                console.error('createBlueprintVersion function not found');
+                alert('Error: Version management functions not loaded. Please refresh the page.');
+            }
+        });
+    }
+});
+
+// Blueprint management functionality
+// Edit blueprint functionality
+window.editBlueprint = function(id) {
+    console.log('Edit blueprint:', id);
+    if (typeof fetchWithCsrf !== 'function') {
+        console.error('CSRF utility functions not found. Make sure csrf.js is loaded.');
+        alert('Error: CSRF utility not available. Please refresh the page.');
+        return;
+    }
+            
+            fetchWithCsrf(`/api/blueprints/${id}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch blueprint details');
+                    }
+                    return response.json();
+                })
+                .then(blueprint => {
+                    // Set form values
+                    document.getElementById('editBlueprintId').value = blueprint.id;
+                    document.getElementById('editName').value = blueprint.name;
+                    document.getElementById('editDescription').value = blueprint.description || '';
+                    
+                    // Show the modal
+                    const modal = document.getElementById('editBlueprintModal');
+                    if (modal) {
+                        const bsModal = new bootstrap.Modal(modal);
+                        bsModal.show();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching blueprint:', error);
+                    alert('Failed to load blueprint details. Please try again.');
+                });
+        };
+        
+        // Delete blueprint functionality
+        window.deleteBlueprint = function(id) {
+            if (!confirm('Are you sure you want to delete this blueprint? This action cannot be undone.')) {
+                return;
+            }
+            
+            // Get CSRF token
+            const csrfToken = document.querySelector('meta[name="_csrf"]').content;
+            const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+            
+            fetch(`/api/blueprints/${id}`, {
+                method: 'DELETE',
+                headers: {
+                    [csrfHeader]: csrfToken
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to delete blueprint');
+                }
+                
+                // Show success message
+                const toast = document.createElement('div');
+                toast.className = 'position-fixed bottom-0 end-0 p-3 toast show';
+                toast.style.zIndex = '11';
+                toast.innerHTML = `
+                    <div class="toast-header bg-success text-white">
+                        <strong class="me-auto">Success</strong>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+                    </div>
+                    <div class="toast-body">
+                        Blueprint deleted successfully!
+                    </div>
+                `;
+                document.body.appendChild(toast);
+                
+                // Remove the blueprint row and its versions row
+                const blueprintRow = document.getElementById(`blueprint-row-${id}`);
+                const versionsRow = document.getElementById(`versions-row-${id}`);
+                if (blueprintRow) blueprintRow.remove();
+                if (versionsRow) versionsRow.remove();
+                
+                // Remove toast after delay
+                setTimeout(() => {
+                    toast.remove();
+                }, 3000);
+            })
+            .catch(error => {
+                console.error('Error deleting blueprint:', error);
+                alert(`Failed to delete blueprint: ${error.message}`);
+            });
+        };
+        
+        console.log('Blueprint initialization complete');
+    }
+})();
