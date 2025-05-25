@@ -1,5 +1,5 @@
 // Blueprint management functionality with page cache integration
-console.log('Loading blueprint.js management module');
+console.log('Loading blueprint-fixed.js management module (with event handler fix)');
 
 // Global blueprint management namespace
 (function(window) {
@@ -7,6 +7,13 @@ console.log('Loading blueprint.js management module');
 
     // Flag to prevent duplicate initialization
     let initialized = false;
+    
+    // Set a global flag to prevent multiple script loading issues
+    if (window.blueprintScriptLoaded) {
+        console.warn('WARNING: Another blueprint script was already loaded. Preventing duplicate initialization.');
+        return; // Exit immediately to prevent double initialization
+    }
+    window.blueprintScriptLoaded = true;
     
     // Make functions available globally for inline event handlers
     window.viewVersions = function(id) {
@@ -118,10 +125,9 @@ console.log('Loading blueprint.js management module');
                                     </span>
                                 </td>
                                 <td>${version.createdBy || ''}</td>
-                                <td>
-                                    <div class="btn-group btn-group-sm">
-                                        <button class="btn btn-info view-fields-btn" data-id="${version.id}" onclick="viewFields(${version.id})">
-                                            <i class="fas fa-list"></i>
+                                <td>                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-info view-fields-btn" data-id="${version.id}" onclick="viewVersionDetail(${version.id})">
+                                            <i class="fas fa-info-circle"></i>
                                         </button>
                                         ${!version.active ? `
                                             <button class="btn btn-success activate-version-btn" data-id="${version.id}" onclick="activateVersion(${version.id})">
@@ -135,9 +141,13 @@ console.log('Loading blueprint.js management module');
                                 </td>
                             </tr>
                         `).join('')}
-                    </tbody>
-                </table>
+                    </tbody>                </table>
             `;
+            
+            // Dispatch an event to notify that versions have been loaded
+            document.dispatchEvent(new CustomEvent('versions:loaded', {
+                detail: { blueprintId, versions }
+            }));
         })
         .catch(error => {
             console.error('Error loading versions:', error);
@@ -188,7 +198,12 @@ console.log('Loading blueprint.js management module');
             return;
         }
         
-        fetchWithCsrf(`/api/blueprints/${id}`)
+        fetchWithCsrf(`/api/blueprints/${id}`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json'
+            }
+        })
             .then(response => {
                 if (!response.ok) {
                     throw new Error('Failed to fetch blueprint details');
@@ -227,7 +242,8 @@ console.log('Loading blueprint.js management module');
         fetch(`/api/blueprints/${id}`, {
             method: 'DELETE',
             headers: {
-                [csrfHeader]: csrfToken
+                [csrfHeader]: csrfToken,
+                'Accept': 'application/json'
             }
         })
         .then(response => {
@@ -265,19 +281,42 @@ console.log('Loading blueprint.js management module');
             console.error('Error deleting blueprint:', error);
             alert(`Failed to delete blueprint: ${error.message}`);
         });
-    };
+    };    // Submit Create Blueprint with duplicate submission protection
+    // Use a debounce mechanism to prevent multiple submissions
+    let submitInProgress = false;
+    let lastSubmitTime = 0;
+    const DEBOUNCE_TIMEOUT = 500; // ms
 
-    // Submit Create Blueprint
     function submitCreateBlueprint(event) {
         if (event) {
             event.preventDefault();
         }
-        console.log('submitCreateBlueprint function called');
+        
+        // Get current timestamp
+        const now = Date.now();
+        
+        // Check if submission is already in progress or if it's too soon after previous submission
+        if (submitInProgress) {
+            console.warn('Blocking duplicate submission - already in progress');
+            return;
+        }
+        
+        if (now - lastSubmitTime < DEBOUNCE_TIMEOUT) {
+            console.warn(`Blocking duplicate submission - too soon (${now - lastSubmitTime}ms since last submit)`);
+            return;
+        }
+        
+        // Update submission state
+        submitInProgress = true;
+        lastSubmitTime = now;
+        
+        console.log('submitCreateBlueprint function called at ' + new Date().toISOString());
         
         // Get form and validate inputs
         const form = document.getElementById('createBlueprintForm');
         if (!form) {
             console.error('Create blueprint form not found');
+            submitInProgress = false;
             return;
         }
         
@@ -358,23 +397,29 @@ console.log('Loading blueprint.js management module');
             // Remove toast after 3 seconds
             setTimeout(() => {
                 toast.remove();
-            }, 3000);
-
-            // Add the new blueprint to the table
+            }, 3000);            // Add the new blueprint to the table
             const blueprintsTable = document.querySelector('table tbody');
             if (blueprintsTable) {
                 const newRow = document.createElement('tr');
+                newRow.id = `blueprint-row-${data.id}`;
+                newRow.className = 'blueprint-row';
                 newRow.innerHTML = `
-                    <td>${data.name}</td>
-                    <td>${data.description || ''}</td>
-                    <td>${data.createdBy || ''}</td>
                     <td>
-                        <div class="btn-group">
-                            <button class="btn btn-sm btn-info" onclick="toggleVersions(${data.id})">
-                                <i id="chevron-${data.id}" class="fas fa-chevron-right"></i>
-                            </button>
+                        <button class="btn btn-link p-0" onclick="toggleVersions(${data.id})" style="text-decoration: none;">
+                            <i class="fas fa-chevron-right me-2" id="chevron-${data.id}"></i>
+                            <span>${data.name}</span>
+                        </button>
+                    </td>
+                    <td>${data.description || ''}</td>
+                    <td></td>
+                    <td>${data.createdBy || 'Administrator'}</td>
+                    <td>
+                        <div class="btn-group" role="group">
                             <button class="btn btn-sm btn-primary" onclick="editBlueprint(${data.id})">
                                 <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-sm btn-success" onclick="toggleVersions(${data.id})">
+                                <i class="fas fa-code-branch"></i>
                             </button>
                             <button class="btn btn-sm btn-danger" onclick="deleteBlueprint(${data.id})">
                                 <i class="fas fa-trash"></i>
@@ -382,42 +427,79 @@ console.log('Loading blueprint.js management module');
                         </div>
                     </td>
                 `;
-                blueprintsTable.appendChild(newRow);
-
-                // Add the versions row
+                // Insert at the top instead of bottom
+                blueprintsTable.insertBefore(newRow, blueprintsTable.firstChild);                // Add the versions row
                 const versionsRow = document.createElement('tr');
                 versionsRow.id = `versions-row-${data.id}`;
                 versionsRow.className = 'versions-row d-none';
                 versionsRow.innerHTML = `
-                    <td colspan="4">
-                        <div class="versions-container">
-                            <div class="versions-form mb-3">
-                                <form id="versionForm-${data.id}" onsubmit="submitCreateBlueprintVersion(event)">
-                                    <input type="hidden" name="blueprintId" value="${data.id}">
+                    <td colspan="5">
+                        <div class="versions-container bg-light">
+                            <!-- Create Version Form -->
+                            <div class="versions-form bg-dark text-light rounded shadow">
+                                <h5 class="mb-3">Create New Version</h5>
+                                <form id="createVersionForm" onsubmit="return false;">
+                                    <input type="hidden" id="versionBlueprintId-${data.id}" value="${data.id}">
                                     <div class="row g-3">
-                                        <div class="col-md-4">
-                                            <input type="text" class="form-control" name="name" placeholder="Version Name" required>
+                                        <div class="col-md-6">
+                                            <label for="name" class="form-label text-light">Name</label>
+                                            <input type="text" class="form-control bg-secondary text-light border-0" id="name" name="name" required="">
                                         </div>
                                         <div class="col-md-6">
-                                            <input type="text" class="form-control" name="description" placeholder="Version Description">
+                                            <label for="description" class="form-label text-light">Description</label>
+                                            <input type="text" class="form-control bg-secondary text-light border-0" id="description" name="description">
                                         </div>
-                                        <div class="col-md-2">
-                                            <button type="submit" class="btn btn-primary w-100">Create</button>
+                                        <div class="col-12">
+                                            <div class="form-check">
+                                                <input type="checkbox" class="form-check-input" id="active" name="active">
+                                                <label class="form-check-label text-light" for="active">Set as active version</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-12">
+                                            <button type="submit" class="btn btn-primary" onclick="submitCreateBlueprintVersion(event)">
+                                                Create Version
+                                            </button>
                                         </div>
                                     </div>
                                 </form>
                             </div>
-                            <div class="versions-list"></div>
+                            
+                            <!-- Loading Indicator -->
+                            <div class="versions-loading text-center py-3 d-none">
+                                <div class="spinner-border spinner-border-sm" role="status">
+                                    <span class="visually-hidden">Loading versions...</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Versions List -->
+                            <div class="versions-list">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    No versions available
+                                </div>
+                            </div>
                         </div>
                     </td>
-                `;
-                blueprintsTable.appendChild(versionsRow);
+                `;                // Insert the versions row right after the blueprint row
+                blueprintsTable.insertBefore(versionsRow, newRow.nextSibling);
             }
-        })
-        .catch(error => {
+            
+            // Reset submission state on success
+            submitInProgress = false;
+        }).catch(error => {
             console.error('Error creating blueprint:', error);
             alert(error.message);
+            // Reset submission state on error
+            submitInProgress = false;
         });
+        
+        // Set a timeout to reset the flag even if the request hangs
+        setTimeout(() => {
+            if (submitInProgress) {
+                console.log('Resetting submission lock after timeout');
+                submitInProgress = false;
+            }
+        }, 10000); // 10 seconds timeout
     }
 
     // Submit Edit Blueprint
@@ -483,8 +565,6 @@ console.log('Loading blueprint.js management module');
             return response.json();
         })
         .then(data => {
-            console.log('Blueprint updated successfully:', data);
-            
             // Close the modal
             const modal = document.getElementById('editBlueprintModal');
             if (modal) {
@@ -493,10 +573,6 @@ console.log('Loading blueprint.js management module');
                     bsModal.hide();
                 }
             }
-            
-            // Show success message
-            alert('Blueprint updated successfully');
-            
             // Reload the page to show the updated blueprint
             window.location.reload();
         })
@@ -504,22 +580,25 @@ console.log('Loading blueprint.js management module');
             console.error('Error updating blueprint:', error);
             alert(error.message);
         });
-    }
-
-    // Initialize event listeners
+    }    // Initialize event listeners
     function initialize() {
         if (initialized) {
             console.warn('Blueprint management already initialized');
             return;
         }
 
-        console.log('Blueprint management initializing...');
+        console.log('Blueprint-fixed management initializing...');
 
         // Add form submit handler
         const createForm = document.getElementById('createBlueprintForm');
         if (createForm) {
-            createForm.addEventListener('submit', submitCreateBlueprint);
-            console.log('Create blueprint form handler attached');
+            // Remove any existing handlers first to be safe
+            const newCreateForm = createForm.cloneNode(true);
+            createForm.parentNode.replaceChild(newCreateForm, createForm);
+            
+            // Add our handler
+            newCreateForm.addEventListener('submit', submitCreateBlueprint);
+            console.log('Create blueprint form handler attached (with duplication protection)');
         }
         
         // Add edit form submit handler
@@ -538,10 +617,18 @@ console.log('Loading blueprint.js management module');
             updateBtn.addEventListener('click', submitEditBlueprint);
         }
         
-        // Add event handler for create button
+        // IMPORTANT: For the create button, we DO NOT add a click handler
+        // because we're using the form submit event, which is triggered when the button is clicked
         const createBtn = document.getElementById('createButton');
         if (createBtn) {
-            createBtn.addEventListener('click', submitCreateBlueprint);
+            console.log('Create button found - NOT adding click handler (form submit is sufficient)');
+            
+            // Remove any existing click handlers by cloning the button
+            if (createBtn.onclick || createBtn._hasClickListener) {
+                console.warn('Found existing click handler on create button - removing it');
+                const newBtn = createBtn.cloneNode(true);
+                createBtn.parentNode.replaceChild(newBtn, createBtn);
+            }
         }
 
         initialized = true;
