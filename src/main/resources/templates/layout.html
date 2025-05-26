@@ -6,12 +6,13 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link th:href="@{/css/theme.css}" rel="stylesheet">
     <link th:href="@{/css/table-fix.css}" rel="stylesheet">
+    <link th:href="@{/css/spa-transitions.css}" rel="stylesheet">
     <!-- Add CSRF meta tags -->
     <meta name="_csrf" th:content="${_csrf.token}"/>
     <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
-    
-    <!-- Critical JavaScript -->
+      <!-- Critical JavaScript -->
     <script th:src="@{/js/csrf.js}"></script>
+    <script th:src="@{/js/blueprint-globals.js}"></script>
       <!-- Custom styles for the sidebar -->
     <style>
         body {
@@ -48,14 +49,15 @@
         
         .sidebar-nav {
             padding: 20px 0;
-        }
-          .sidebar-nav .nav-link {
-            padding: 12px 20px;
+        }        .sidebar-nav .nav-link {
+            padding: 12px 10px;
             color: var(--sidebar-text);
             border-radius: 0;
             font-size: 1.1rem;
             white-space: nowrap;
             overflow: hidden;
+            width: 100%;
+            text-align: center;
         }
         
         .sidebar-nav .nav-link:hover, 
@@ -63,6 +65,7 @@
         .sidebar-nav .nav-link.active {
             color: #fff;
             background-color: rgba(255,255,255,.1);
+            width: 100%;
         }
         
         .sidebar-nav .nav-link i {
@@ -146,6 +149,16 @@
                         <span class="nav-text">Users</span>
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link" th:href="@{/hybrid-demo}" title="Hybrid Demo">
+                        <i class="fas fa-code-branch"></i>
+                        <span class="nav-text">Hybrid Demo</span>
+                    </a>                </li>                <li class="nav-item">
+                    <a class="nav-link open-in-new-tab" th:href="@{/page-cache-test}" title="Cache Test" target="_blank" data-mpa="true">
+                        <i class="fas fa-vial"></i>
+                        <span class="nav-text">Cache Test</span>
+                    </a>
+                </li>
                 <li class="nav-item mt-auto">
                     <form th:action="@{/logout}" method="post" class="d-inline">
                         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
@@ -157,26 +170,67 @@
                 </li>
             </ul>
         </div>
-    </div>
-
-    <!-- Main content -->
+    </div>    <!-- Main content -->
     <div class="content-wrapper">
-        <div class="container-fluid p-4">
+        <div id="main-content" class="container-fluid p-0">
             <div layout:fragment="content"></div>
         </div>
-    </div>    <!-- Theme toggle button -->
+    </div><!-- Theme toggle button -->
     <button id="themeToggle" class="theme-toggle btn btn-dark" title="Switch to Dark Mode">
         <i class="fas fa-moon"></i>
     </button>
-    
-    <!-- Common scripts -->    
+      <!-- Common scripts -->    
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://unpkg.com/wicg-inert@latest/dist/inert.min.js"></script>
-    <script th:src="@{/js/enhanced-debug.js}"></script>
-    <script th:src="@{/js/form-debug.js}"></script>
-    <script th:src="@{/js/page-cache.js}"></script>
-    <script th:src="@{/js/theme-switcher.js}"></script>
+    
+    <!-- Script Deduplication System -->
+    <script th:src="@{/js/script-deduplication.js}"></script>
+    
+    <!-- Load scripts using deduplication system -->
+    <script>
+        // Wait for script deduplication system to be ready
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof loadScriptOnce === 'function') {
+                // Load scripts in order using deduplication
+                Promise.all([
+                    loadScriptOnce('/js/enhanced-debug.js'),
+                    loadScriptOnce('/js/form-debug.js'),
+                    loadScriptOnce('/js/spa-router.js'),
+                    loadScriptOnce('/js/hybrid-navigation.js'),
+                    loadScriptOnce('/js/page-reload-debug.js'),
+                    loadScriptOnce('/js/page-cache.js'),
+                    loadScriptOnce('/js/tab-state-manager.js'),
+                    loadScriptOnce('/js/page-cache-test.js'),
+                    loadScriptOnce('/js/comprehensive-cache-test.js'),
+                    loadScriptOnce('/js/page-cache-demo.js'),
+                    loadScriptOnce('/js/blueprint-version.js'),
+                    loadScriptOnce('/js/blueprint-version-fixed.js'),
+                    loadScriptOnce('/js/theme-switcher.js')
+                ]).then(() => {
+                    console.log('%c[Layout] All scripts loaded successfully', 'color: #27ae60; font-weight: bold;');
+                }).catch(error => {
+                    console.error('[Layout] Error loading scripts:', error);
+                });
+            } else {
+                console.error('[Layout] Script deduplication system not available, falling back to direct loading');
+                // Fallback to direct script loading if deduplication fails
+                const scripts = [
+                    '/js/enhanced-debug.js', '/js/form-debug.js', '/js/spa-router.js',
+                    '/js/hybrid-navigation.js', '/js/page-reload-debug.js', '/js/page-cache.js',
+                    '/js/tab-state-manager.js', '/js/page-cache-test.js', '/js/comprehensive-cache-test.js',
+                    '/js/page-cache-demo.js', '/js/blueprint-version.js', '/js/blueprint-version-fixed.js',
+                    '/js/theme-switcher.js'
+                ];
+                
+                scripts.forEach(src => {
+                    const script = document.createElement('script');
+                    script.src = src;
+                    document.head.appendChild(script);
+                });
+            }
+        });
+    </script>
     
     <!-- Sidebar toggle script -->
     <script>
